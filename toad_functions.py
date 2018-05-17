@@ -114,15 +114,29 @@ def getNotificationsAndActivatingSensors(dropbox_file_names, file_history, senso
                 pass # Malformed filename, don't worry about it
     return (notifications_to_send, activated_sensors)
 
+def updateState(notifications_to_send, activated_sensors, file_history, sensor_history):
+    for sensor in activated_sensors:
+        # Update state for this sensor
+        sensor_history[sensor] = str(datetime.now())
+    # We're only updating files if a notification was sent
+    if len(activated_sensors) > 0:
+        for notification in notifications_to_send:
+            (filename, recorded_at, _sensor) = notification
+            file_history[filename] = True
+    # Return the updated state
+    return (file_history, sensor_history)
+
 def sendNotifications(notifications_to_send, activated_sensors, send_to_emails, send_from, sg, debug=False):
     # If we have activated sensors, group notifications by sensor and send a bundled email now
     if len(activated_sensors) > 0:
         email_body = "<h1>Toad Update in Dropbox</h1>"
         for sensor in activated_sensors:
+            # Process for this sensor
             email_body = email_body + "<h2>Suspicious recordings from " + sensor + "</h2>"
             for notification in notifications_to_send:
                 (filename, recorded_at, _sensor) = notification
                 if sensor == _sensor:
+                    # Add the file to the email
                     email_body = email_body + "<p>" + filename + "</p>"
         # Send the group notification
         if (not debug):

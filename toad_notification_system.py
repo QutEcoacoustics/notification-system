@@ -13,9 +13,17 @@ from sendgrid.helpers.mail import *
 system_configuration = json.loads(open("config.json", "r").read())
 bot_address = system_configuration['send_from']
 
+# Open files
+file_history_io = open("files.json", "r")
+sensor_history_io = open("sensors.json", "r")
+
 # Load state databases from text file
-file_history = json.loads(open("files.json", "r").read())
-sensor_history = json.loads(open("sensors.json", "r").read())
+file_history = json.loads(file_history_io.read())
+sensor_history = json.loads(sensor_history_io.read())
+
+# Close files
+file_history_io.close();
+sensor_history_io.close();
 
 # Authenticate
 sg = sendgrid.SendGridAPIClient(apikey=system_configuration['sendgrid_api_key'])
@@ -32,6 +40,15 @@ send_to_emails = getEmailsFromDropbox(dropbox_files, system_configuration["filen
 # Search for new notifications, in the context of file and sensor history
 pause_duration = int(system_configuration["pause_duration"])
 (notifications_to_send, activated_sensors) = getNotificationsAndActivatingSensors(dropbox_file_names, file_history, sensor_history, pause_duration)
+
+# Update state
+(file_history, sensor_history) = updateState(notifications_to_send, activated_sensors, file_history, sensor_history)
+file_history_io = open("files.json", "w")
+sensor_history_io = open("sensors.json", "w")
+json.dump(file_history, file_history_io)
+json.dump(sensor_history, sensor_history_io)
+file_history_io.close();
+sensor_history_io.close();
 
 # Send Notifications
 sendNotifications(notifications_to_send, activated_sensors, send_to_emails, bot_address, sg, debug=False)

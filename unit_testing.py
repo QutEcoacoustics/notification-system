@@ -91,13 +91,25 @@ class MyTest(unittest.TestCase):
         file_history = json.loads(self.scenario1_file_history)
         sensor_history = json.loads(self.scenario1_sensors)
         (notifications_to_send, activated_sensors) = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600)
-        self.assertEqual(len(activated_sensors), 1)
+        self.assertEqual(len(activated_sensors), 1) # Notification should have been sent
         self.assertEqual(len(notifications_to_send), 1)
+        # Test state update. This should always result in zero activated sensors, and if a notification *was* sent,
+        # the count of notifications to send should now be zero as well.
+        (file_history, sensor_history) = updateState(notifications_to_send, activated_sensors, file_history, sensor_history)
+        (notifications_to_send, activated_sensors) = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600)
+        self.assertEqual(len(activated_sensors), 0)
+        self.assertEqual(len(notifications_to_send), 0)
 
     def test_scenario_2(self):
         files = self.scenario2_files
         file_history = json.loads(self.scenario2_file_history)
         sensor_history = json.loads(self.scenario2_sensors)
+        (notifications_to_send, activated_sensors) = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600)
+        self.assertEqual(len(activated_sensors), 0)
+        self.assertEqual(len(notifications_to_send), 1)
+        # Test state update. This should always result in zero activated sensors, and if a notification *was* sent,
+        # the count of notifications to send should now be zero as well. Otherwise, it will be the same.
+        (file_history, sensor_history) = updateState(notifications_to_send, activated_sensors, file_history, sensor_history)
         (notifications_to_send, activated_sensors) = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600)
         self.assertEqual(len(activated_sensors), 0)
         self.assertEqual(len(notifications_to_send), 1)
@@ -107,21 +119,39 @@ class MyTest(unittest.TestCase):
         file_history = json.loads(self.scenario3_file_history)
         sensor_history = json.loads(self.scenario3_sensors)
         (notifications_to_send, activated_sensors) = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600)
-        self.assertEqual(len(activated_sensors), 1)
+        self.assertEqual(len(activated_sensors), 1) # Notification should have been sent
         self.assertEqual(len(notifications_to_send), 2)
+        # Test state update. This should always result in zero activated sensors, and if a notification *was* sent,
+        # the count of notifications to send should now be zero as well.
+        (file_history, sensor_history) = updateState(notifications_to_send, activated_sensors, file_history, sensor_history)
+        (notifications_to_send, activated_sensors) = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600)
+        self.assertEqual(len(activated_sensors), 0)
+        self.assertEqual(len(notifications_to_send), 0)
 
     def test_scenario_4(self):
         files = self.scenario4_files
         file_history = json.loads(self.scenario4_file_history)
         sensor_history = json.loads(self.scenario4_sensors)
         (notifications_to_send, activated_sensors) = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600)
-        self.assertEqual(len(activated_sensors), 1)
+        self.assertEqual(len(activated_sensors), 1) # Notification should have been sent
         self.assertEqual(len(notifications_to_send), 2)
+        # Test state update. This should always result in zero activated sensors, and if a notification *was* sent,
+        # the count of notifications to send should now be zero as well.
+        (file_history, sensor_history) = updateState(notifications_to_send, activated_sensors, file_history, sensor_history)
+        (notifications_to_send, activated_sensors) = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600)
+        self.assertEqual(len(activated_sensors), 0)
+        self.assertEqual(len(notifications_to_send), 0)
 
     def test_scenario_5(self):
         files = self.scenario5_files
         file_history = json.loads(self.scenario5_file_history)
         sensor_history = json.loads(self.scenario5_sensors)
+        (notifications_to_send, activated_sensors) = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600)
+        self.assertEqual(len(activated_sensors), 0)
+        self.assertEqual(len(notifications_to_send), 2)
+        # Test state update. This should always result in zero activated sensors, and if a notification *was* sent,
+        # the count of notifications to send should now be zero as well.
+        (file_history, sensor_history) = updateState(notifications_to_send, activated_sensors, file_history, sensor_history)
         (notifications_to_send, activated_sensors) = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600)
         self.assertEqual(len(activated_sensors), 0)
         self.assertEqual(len(notifications_to_send), 2)

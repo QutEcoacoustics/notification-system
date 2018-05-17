@@ -12,7 +12,7 @@ A simple python and cron combination to send alerts when files are added to a dr
 
 ## Config
 
-Place a `config.json` file alongside `toad_functions.py` and the rest with the following format:
+Place a `config.json` file alongside `toad_functions.py` etc with the following format:
 ```
 {
   "sendgrid_api_key": "<place your key here>",

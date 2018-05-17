@@ -51,7 +51,7 @@ file_history_io.close();
 sensor_history_io.close();
 
 # Send Notifications
-sendNotifications(notifications_to_send, activated_sensors, send_to_emails, bot_address, sg, debug=False)
+sendNotifications(notifications_to_send, activated_sensors, send_to_emails, bot_address, sg, dbx, debug=False)
 
 # Done
 print("Script finished")

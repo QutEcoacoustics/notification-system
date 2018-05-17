@@ -126,7 +126,7 @@ def updateState(notifications_to_send, activated_sensors, file_history, sensor_h
     # Return the updated state
     return (file_history, sensor_history)
 
-def sendNotifications(notifications_to_send, activated_sensors, send_to_emails, send_from, sg, debug=False):
+def sendNotifications(notifications_to_send, activated_sensors, send_to_emails, send_from, sg, dbx, debug=False):
     # If we have activated sensors, group notifications by sensor and send a bundled email now
     if len(activated_sensors) > 0:
         email_body = "<h1>Toad Update in Dropbox</h1>"
@@ -137,7 +137,7 @@ def sendNotifications(notifications_to_send, activated_sensors, send_to_emails, 
                 (filename, recorded_at, _sensor) = notification
                 if sensor == _sensor:
                     # Add the file to the email
-                    email_body = email_body + "<p>" + filename + "</p>"
+                    email_body = email_body + "<p><a href=\"" + dbx.files_get_temporary_link("/" + filename).link + "\">" + filename + "</a></p>"
         # Send the group notification
         if (not debug):
             sendEmail(email_body, send_to_emails, send_from, sg)

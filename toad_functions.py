@@ -49,83 +49,89 @@ def sendEmail(body, send_to_emails, send_from, sg):
     return completed_well
 
 # Recursively pull list of files in Dropbox
-def getFilesFromDropbox(dbx):
-	dropbox_files = []
-	finished_looping = False
-	fetched_files = dbx.files_list_folder('')
-	while (not finished_looping):
-	    for entry in fetched_files.entries:
-	        dropbox_files.append(entry)
-	    if fetched_files.has_more:
-	        fetched_files = dbx.files_list_folder_continue(fetched_files.cursor).entries
-	    else:
-	        finished_looping = True
-	return dropbox_files
+def getFilesFromDropbox(dbx, root_folder=''):
+    dropbox_files = []
+    finished_looping = False
+    fetched_files = dbx.files_list_folder(root_folder)
+    while (not finished_looping):
+        for entry in fetched_files.entries:
+            dropbox_files.append(entry)
+        if fetched_files.has_more:
+            fetched_files = dbx.files_list_folder_continue(fetched_files.cursor).entries
+        else:
+            finished_looping = True
+    return dropbox_files
 
-def getEmailsFromDropbox(dropbox_files, email_config_file_name, dbx, debug=False, debug_content=""):
-	send_to_emails = []
-	for entry in dropbox_files:
-	    print(entry.name) # Debugging
-	    if email_config_file_name in entry.name:
-	        print("Found it")
-	        # This is the file that contains the emails to send to
-	        temp_file = "./emails_to_send_to.txt"
-	        email_file_data = debug_content
-	        if (not debug):
-		        dbx.files_download_to_file(temp_file, entry.path_lower)
-		        email_file_data = open(temp_file, "r").read()
-	        # Pull the email data out
-	        send_to_emails = [x.strip() for x in email_file_data.split('\n')]
-	        # Debugging log
-	        for email_txt in send_to_emails:
-	            print(email_txt)
-	        break
-	return send_to_emails
+def getEmailsFromDropbox(dropbox_files, email_config_file_name, dbx, debug=False, debug_content="", debug_files=""):
+    send_to_emails = []
+    if not dropbox_files == None:
+        for entry in dropbox_files:
+            if email_config_file_name in entry.name:
+                # This is the file that contains the emails to send to
+                temp_file = "./emails_to_send_to.txt"
+                email_file_data = debug_content
+                if (not debug):
+                    dbx.files_download_to_file(temp_file, entry.path_lower)
+                    email_file_data = open(temp_file, "r").read()
+                # Pull the email data out
+                send_to_emails = [x.strip() for x in email_file_data.split('\n')]
+                break
+    else:
+        # Same as above but with debugging workflow
+        for entry in debug_files:
+            if email_config_file_name in entry:
+                email_file_data = debug_content
+                send_to_emails = [x.strip() for x in email_file_data.split('\n')]
+                break;
+    return send_to_emails
 
 def getNotificationsAndActivatingSensors(dropbox_file_names, file_history, sensor_history, pause_duration):
-	# Array of tuples to store results of the upcoming search
-	notifications_to_send = []
-	activated_sensors = []
-	# Check for new records by comparing against what we already have
-	for entry in dropbox_file_names:
-	    if entry not in file_history:
-	        try:
-	            # Extract semantic info from name for easy processing
-	            (recorded_at, sensor) = parseFileInfo(entry)
-	            notifications_to_send.append((entry, recorded_at, sensor)) # Append notification regardless of whether or not any sensor will trigger an email
-	            # Have we seen this sensor before?
-	            if sensor in sensor_history:
-	                previous_fire = parser.parse(sensor_history[sensor])
-	                elapsed_time = recorded_at - previous_fire
-	                (hours, remainder) = divmod(elapsed_time.total_seconds(), pause_duration)
-	                if hours >= 1:
-	                    # If the sensor has already fired within the last hour, don't notify yet - we'll catch it in the future
-	                    # Otherwise, append it to the list to the list to ensure we send a bundled notification now
-	                    if not sensor in activated_sensors:
-	                        activated_sensors.append(sensor)
-	            else:
-	                # Brand new sensor, add it to the list
-	                if not sensor in activated_sensors:
-	                    activated_sensors.append(sensor)
-	        except:
-	            pass # Malformed filename, don't worry about it
-	return (notifications_to_send, activated_sensors)
+    # Array of tuples to store results of the upcoming search
+    notifications_to_send = []
+    activated_sensors = []
+    # Check for new records by comparing against what we already have
+    for entry in dropbox_file_names:
+        #print(str(entry[1:]))
+        #print(file_history)
+        if entry not in file_history:
+            #print("We made it here")
+            try:
+                # Extract semantic info from name for easy processing
+                (recorded_at, sensor) = parseFileInfo(entry)
+                notifications_to_send.append((entry, recorded_at, sensor)) # Append notification regardless of whether or not any sensor will trigger an email
+                # Have we seen this sensor before?
+                if sensor in sensor_history:
+                    previous_fire = parser.parse(sensor_history[sensor])
+                    elapsed_time = recorded_at - previous_fire
+                    (hours, remainder) = divmod(elapsed_time.total_seconds(), pause_duration)
+                    if hours >= 1:
+                        # If the sensor has already fired within the last hour, don't notify yet - we'll catch it in the future
+                        # Otherwise, append it to the list to the list to ensure we send a bundled notification now
+                        if not sensor in activated_sensors:
+                            activated_sensors.append(sensor)
+                else:
+                    # Brand new sensor, add it to the list
+                    if not sensor in activated_sensors:
+                        activated_sensors.append(sensor)
+            except:
+                pass # Malformed filename, don't worry about it
+    return (notifications_to_send, activated_sensors)
 
 def sendNotifications(notifications_to_send, activated_sensors, send_to_emails, send_from, sg, debug=False):
-	# If we have activated sensors, group notifications by sensor and send a bundled email now
-	if len(activated_sensors) > 0:
-	    email_body = "<h1>Toad Update in Dropbox</h1>"
-	    for sensor in activated_sensors:
-	        email_body = email_body + "<h2>Suspicious recordings from " + sensor + "</h2>"
-	        for notification in notifications_to_send:
-	            (filename, recorded_at, _sensor) = notification
-	            if sensor == _sensor:
-	                email_body = email_body + "<p>" + filename + "</p>"
-	    # Send the group notification
-	    if (not debug):
-	    	sendEmail(email_body, send_to_emails, send_from, sg)
-	    print(send_to_emails)
-	    print("Notification sent to subscribers")
-	    return True
-	else:
-		return False
+    # If we have activated sensors, group notifications by sensor and send a bundled email now
+    if len(activated_sensors) > 0:
+        email_body = "<h1>Toad Update in Dropbox</h1>"
+        for sensor in activated_sensors:
+            email_body = email_body + "<h2>Suspicious recordings from " + sensor + "</h2>"
+            for notification in notifications_to_send:
+                (filename, recorded_at, _sensor) = notification
+                if sensor == _sensor:
+                    email_body = email_body + "<p>" + filename + "</p>"
+        # Send the group notification
+        if (not debug):
+            sendEmail(email_body, send_to_emails, send_from, sg)
+        print(send_to_emails)
+        print("Notification sent to subscribers")
+        return True
+    else:
+        return False

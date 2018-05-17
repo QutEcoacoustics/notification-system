@@ -23,14 +23,15 @@ dbx = dropbox.Dropbox(system_configuration['dropbox_api_key'])
 dbx.users_get_current_account()
 
 # Pull list of files in Dropbox
-dropbox_files = getFilesFromDropbox(dbx)
+dropbox_files = getFilesFromDropbox(dbx, root_folder=system_configuration['root_folder'])
+dropbox_file_names = [entry.name for entry in dropbox_files]
 
 # Get list of emails to send to by scanning Dropbox
 send_to_emails = getEmailsFromDropbox(dropbox_files, system_configuration["filename_send_to"], dbx, debug=False)
 
 # Search for new notifications, in the context of file and sensor history
 pause_duration = int(system_configuration["pause_duration"])
-(notifications_to_send, activated_sensors) = getNotificationsAndActivatingSensors([entry.name for entry in dropbox_files], file_history, sensor_history, pause_duration)
+(notifications_to_send, activated_sensors) = getNotificationsAndActivatingSensors(dropbox_file_names, file_history, sensor_history, pause_duration)
 
 # Send Notifications
 sendNotifications(notifications_to_send, activated_sensors, send_to_emails, bot_address, sg, debug=False)

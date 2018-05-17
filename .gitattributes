@@ -1,0 +1,5 @@
+
+# Ensure we're always working with LF line endings, even on Windows
+*crontab text eol=lf
+*Dockerfile text eol=lf
+*.py text eol=lf

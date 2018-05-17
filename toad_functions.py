@@ -91,10 +91,7 @@ def getNotificationsAndActivatingSensors(dropbox_file_names, file_history, senso
     activated_sensors = []
     # Check for new records by comparing against what we already have
     for entry in dropbox_file_names:
-        #print(str(entry[1:]))
-        #print(file_history)
-        if entry not in file_history:
-            #print("We made it here")
+        if entry not in file_history or file_history[entry] == False:
             try:
                 # Extract semantic info from name for easy processing
                 (recorded_at, sensor) = parseFileInfo(entry)

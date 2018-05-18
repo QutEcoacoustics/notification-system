@@ -1,1 +1,1 @@
-0/5 * * * * root python "/toad_notification_system.py" >> /var/log/cron.log 2>&1
+0/5 * * * * root python3 "/toad_notification_system.py" >> /var/log/cron.log 2>&1

@@ -5,7 +5,16 @@ A simple python and cron combination to send alerts when files are added to a dr
 [![Build Status](https://travis-ci.org/QutEcoacoustics/notification-system.svg?branch=master)](https://travis-ci.org/QutEcoacoustics/notification-system)
 
 
-## Setup
+## Developments
+
+1. Requires Python 3.5 or above.
+  - `apt-get install python3`
+  - `apt-get install python3-pip`
+1. Clone the repo
+1. `pip install -r requirements.txt`
+1. Run the unit tests: `python unit_testing.py`
+
+## Production
 
 - Install docker
 - Build Docker image: `docker build . -t qutecoacoustics/notification-system:latest`

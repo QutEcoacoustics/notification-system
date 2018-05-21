@@ -5,13 +5,17 @@ A simple python and cron combination to send alerts when files are added to a dr
 [![Build Status](https://travis-ci.org/QutEcoacoustics/notification-system.svg?branch=master)](https://travis-ci.org/QutEcoacoustics/notification-system)
 
 
-## Developments
+## Development
 
 1. Requires Python 3.5 or above.
   - `apt-get install python3`
   - `apt-get install python3-pip`
+1. Requires pipenv:
+  `pip install pipenv`
 1. Clone the repo
-1. `pip install -r requirements.txt`
+1. `pipenv install`
+1. Start the pipenv shell
+  - `pipenv shell`
 1. Run the unit tests: `python unit_testing.py`
 
 ## Production

@@ -19,7 +19,7 @@ def parseFileInfo(filename):
 # body is the content of the email, send_to_emails is the array of emails to send to, send_from is the address to send from, sg is a SendGrid object
 # returns true if everything worked.
 def sendEmail(body, send_to_emails, send_from, sg):
-    completed_well = True
+    completed_well = False
     # Send emails
     for recipient in send_to_emails:
         # Prepare the email
@@ -42,13 +42,13 @@ def sendEmail(body, send_to_emails, send_from, sg):
         # Send the email
         response = sg.client.mail.send.post(request_body=mail.get())
         # Check the response and return true if success (any HTTP code starting with 2)
-        if not str(response.status_code).startswith('2'):
-            completed_well = False
+        if str(response.status_code).startswith('2'):
+            completed_well = True
             break
     # Indicate whether everything worked as expected
     return completed_well
 
-# Recursively pull list of files in Dropbox
+# iteratively pull list of files in Dropbox
 def getFilesFromDropbox(dbx, root_folder=''):
     dropbox_files = []
     finished_looping = False
@@ -62,27 +62,25 @@ def getFilesFromDropbox(dbx, root_folder=''):
             finished_looping = True
     return dropbox_files
 
-def getEmailsFromDropbox(dropbox_files, email_config_file_name, dbx, debug=False, debug_content="", debug_files=""):
+def getEmailsFromDropbox(email_config_file_path, dbx, debug=False, debug_content="", debug_files=""):
     send_to_emails = []
-    if not dropbox_files == None:
-        for entry in dropbox_files:
-            if email_config_file_name in entry.name:
-                # This is the file that contains the emails to send to
-                temp_file = "./emails_to_send_to.txt"
-                email_file_data = debug_content
-                if (not debug):
-                    dbx.files_download_to_file(temp_file, entry.path_lower)
-                    email_file_data = open(temp_file, "r").read()
-                # Pull the email data out
-                send_to_emails = [x.strip() for x in email_file_data.split('\n')]
-                break
+    if not debug:
+        # This is the file that contains the emails to send to
+        temp_file = "./emails_to_send_to.txt"
+
+        # Download file from dropbox
+        dbx.files_download_to_file(temp_file, email_config_file_path)
+        
+        email_file_data = open(temp_file, "r").read()
+        # Pull the email data out
+        send_to_emails = [x.strip() for x in email_file_data.split('\n')]
     else:
         # Same as above but with debugging workflow
         for entry in debug_files:
-            if email_config_file_name in entry:
+            if email_config_file_path in entry:
                 email_file_data = debug_content
                 send_to_emails = [x.strip() for x in email_file_data.split('\n')]
-                break;
+                break
     return send_to_emails
 
 def getNotificationsAndActivatingSensors(dropbox_file_names, file_history, sensor_history, pause_duration):
@@ -95,7 +93,8 @@ def getNotificationsAndActivatingSensors(dropbox_file_names, file_history, senso
             try:
                 # Extract semantic info from name for easy processing
                 (recorded_at, sensor) = parseFileInfo(entry)
-                notifications_to_send.append((entry, recorded_at, sensor)) # Append notification regardless of whether or not any sensor will trigger an email
+                # Append notification regardless of whether or not any sensor will trigger an email
+                notifications_to_send.append((entry, recorded_at, sensor))
                 # Have we seen this sensor before?
                 if sensor in sensor_history:
                     previous_fire = parser.parse(sensor_history[sensor])
@@ -126,7 +125,7 @@ def updateState(notifications_to_send, activated_sensors, file_history, sensor_h
     # Return the updated state
     return (file_history, sensor_history)
 
-def sendNotifications(notifications_to_send, activated_sensors, send_to_emails, send_from, sg, dbx, debug=False):
+def sendNotifications(dropbox_files, notifications_to_send, activated_sensors, send_to_emails, send_from, sg, dbx, debug=False):
     # If we have activated sensors, group notifications by sensor and send a bundled email now
     if len(activated_sensors) > 0:
         email_body = "<h1>Toad Update in Dropbox</h1>"
@@ -135,9 +134,15 @@ def sendNotifications(notifications_to_send, activated_sensors, send_to_emails, 
             email_body = email_body + "<h2>Suspicious recordings from " + sensor + "</h2>"
             for notification in notifications_to_send:
                 (filename, recorded_at, _sensor) = notification
+                # find the drop box file name, get the path_lower to use for get_temporary_link
+                for entry in dropbox_files:
+                    if filename in entry.name:
+                        db_path = entry.path_lower
+                        break
+
                 if sensor == _sensor:
                     # Add the file to the email
-                    email_body = email_body + "<p><a href=\"" + dbx.files_get_temporary_link("/" + filename).link + "\">" + filename + "</a></p>"
+                    email_body = email_body + "<p><a href=\"" + dbx.files_get_temporary_link(db_path).link + "\">" + filename + "</a></p>"
         # Send the group notification
         if (not debug):
             sendEmail(email_body, send_to_emails, send_from, sg)

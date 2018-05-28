@@ -1,5 +1,6 @@
 # Import libraries
 import os
+import sys
 import json
 import requests
 import datetime
@@ -10,7 +11,10 @@ from toad_functions import *
 from sendgrid.helpers.mail import *
 
 # Load configuration
-system_configuration = json.loads(open("config.json", "r").read())
+config_path = "./config.json"
+if len(sys.argv) >= 2:
+    config_path = sys.argv[1]
+system_configuration = json.loads(open(config_path, "r").read())
 bot_address = system_configuration['send_from']
 
 # Open files
@@ -35,7 +39,7 @@ dropbox_files = getFilesFromDropbox(dbx, root_folder=system_configuration['root_
 dropbox_file_names = [entry.name for entry in dropbox_files]
 
 # Get list of emails to send to by scanning Dropbox
-send_to_emails = getEmailsFromDropbox(dropbox_files, system_configuration["filename_send_to"], dbx, debug=False)
+send_to_emails = getEmailsFromDropbox(system_configuration["filename_send_to"], dbx, debug=False)
 
 # Search for new notifications, in the context of file and sensor history
 pause_duration = int(system_configuration["pause_duration"])
@@ -51,7 +55,7 @@ file_history_io.close();
 sensor_history_io.close();
 
 # Send Notifications
-sendNotifications(notifications_to_send, activated_sensors, send_to_emails, bot_address, sg, dbx, debug=False)
+sendNotifications(dropbox_files, notifications_to_send, activated_sensors, send_to_emails, bot_address, sg, dbx, debug=False)
 
 # Done
 print("Script finished")

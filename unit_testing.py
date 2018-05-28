@@ -83,7 +83,7 @@ class MyTest(unittest.TestCase):
 
     def test_email_extraction(self):
         expected_result = ["test@example.com", "test2@ex.com"]
-        test_result = getEmailsFromDropbox(None, "<placeholder>", None, True, "test@example.com\ntest2@ex.com", ["<placeholder>"])
+        test_result = getEmailsFromDropbox("<placeholder>", None, True, "test@example.com\ntest2@ex.com", ["<placeholder>"])
         self.assertEqual(test_result, expected_result)
 
     def test_scenario_1(self):

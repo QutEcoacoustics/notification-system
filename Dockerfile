@@ -31,7 +31,7 @@ RUN useradd -d /home/debian -m -s /bin/bash -u 1000 -p '*' -U debian
 USER debian
 WORKDIR /notification_system
 
-COPY --chown=debian ./ /notification_system/
+COPY ./ /notification_system/
 
 RUN pipenv install --deploy --system
 

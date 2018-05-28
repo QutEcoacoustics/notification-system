@@ -100,4 +100,5 @@ ENV/
 # mypy
 .mypy_cache/
 
-config\.json
+config.json
+emails_to_send_to.txt

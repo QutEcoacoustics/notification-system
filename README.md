@@ -22,6 +22,9 @@ A simple python and cron combination to send alerts when files are added to a dr
 
 - Install docker
 - Build Docker image: `docker build . -t qutecoacoustics/notification-system:latest`
+- Define the path to your properly configured config directory:
+  ` NS_CONFIG=$(pwd)`
+- Run the Docker image: `docker run --mount "type=bind,source=$NS_CONFIG,destination=/config" qutecoacoustics/notification-system:latest`
 
 ## Config
 
@@ -31,6 +34,7 @@ Place a `config.json` file alongside `toad_functions.py` etc with the following 
   "sendgrid_api_key": "<place your key here>",
   "dropbox_api_key": "<place your key here>",
   "send_from": "\"<project name>\" <email@example.com>",
+  // the path to the file in dropbox containing the receiver list
   "filename_send_to": "email_alert_list.txt",
   "pause_duration": "3600",
   "root_folder": ""

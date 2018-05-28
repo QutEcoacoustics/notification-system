@@ -16,6 +16,8 @@ six = "==1.11.0"
 python_http_client = "==3.0.0"
 
 [dev-packages]
+pylint = "*"
+rope = "*"
 
 [requires]
 python_version = "3.6"

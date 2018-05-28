@@ -1,24 +1,39 @@
-FROM ubuntu:18.04
+FROM python:3.6.5-slim-stretch
 
-ENV  LC_ALL=C.UTF-8 LANG=C.UTF-8
 
+ENV SUPERCRONIC_URL=https://github.com/aptible/supercronic/releases/download/v0.1.5/supercronic-linux-amd64 \
+    SUPERCRONIC=supercronic-linux-amd64 \
+    SUPERCRONIC_SHA1SUM=9aeb41e00cc7b71d30d33c57a2333f2c2581a201
+
+# install deps
 RUN apt-get update \
-    && apt-get -y install cron python3 python3-pip \
-    && pip3 install pipenv
+    && apt-get install -y curl dumb-init \
+    && curl -fsSLO "$SUPERCRONIC_URL" \
+    # install supercronic
+    && echo "${SUPERCRONIC_SHA1SUM}  ${SUPERCRONIC}" | sha1sum -c - \
+    && chmod +x "$SUPERCRONIC" \
+    && mv "$SUPERCRONIC" "/usr/local/bin/${SUPERCRONIC}" \
+    && ln -s "/usr/local/bin/${SUPERCRONIC}" /usr/local/bin/supercronic \
+    # clean up dependencies
+    && apt-get purge -y curl \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install pipenv
 
 # Run cron job
-COPY crontab /etc/cron.d/notification-system-cronjob
-RUN chmod u+x /etc/cron.d/notification-system-cronjob \
-    && touch /var/log/cron.log
+# COPY crontab /etc/cron.d/notification-system-cronjob
+# RUN chmod u+x /etc/cron.d/notification-system-cronjob \
+#     && touch /var/log/cron.log
 
-# deprivledge root user
-RUN useradd -d /home/ubuntu -ms /bin/bash -g root -G sudo -p ubuntu ubuntu
-USER ubuntu
-WORKDIR /home/ubuntu/notification_system
+# deprivilege root user
+RUN useradd -d /home/debian -m -s /bin/bash -u 1000 -p '*' -U debian
+USER debian
+WORKDIR /notification_system
 
-COPY --chown=ubuntu ./ ./
+COPY --chown=debian ./ /notification_system/
 
-RUN pipenv install
+RUN pipenv install --deploy --system
 
 
-CMD ["cron", "-f"]
+CMD supercronic /notification_system/crontab

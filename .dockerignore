@@ -1,5 +1,6 @@
 .git
 .gitignore
 .gitattributes
+emails_to_send.txt
 
 __pycache__

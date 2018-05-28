@@ -1,1 +1,1 @@
-0/5 * * * * ubuntu cd /home/ubuntu/notification_system && pipenv run python "toad_notification_system.py" >> /var/log/cron.log 2>&1
+0/5 * * * * python3 /notification_system/toad_notification_system.py /config/config.json

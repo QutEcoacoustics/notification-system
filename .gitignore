@@ -102,3 +102,5 @@ ENV/
 
 config.json
 emails_to_send_to.txt
+files.json
+sensors.json

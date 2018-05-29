@@ -19,8 +19,6 @@ RUN apt-get update \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install pipenv
-
 # Run cron job
 # COPY crontab /etc/cron.d/notification-system-cronjob
 # RUN chmod u+x /etc/cron.d/notification-system-cronjob \
@@ -28,12 +26,18 @@ RUN pip3 install pipenv
 
 # deprivilege root user
 RUN useradd -d /home/debian -m -s /bin/bash -u 1000 -p '*' -U debian
-USER debian
+
+
 WORKDIR /notification_system
 
 COPY ./ /notification_system/
+# The chown option for COPY is not supported yet on docker hub :-/
+RUN chown debian *
 
-RUN pipenv install --deploy --system
+USER debian
 
+ENV PATH="/home/debian/.local/bin:${PATH}"
+
+RUN pip3 install --user pipenv && pipenv install --deploy
 
 CMD supercronic /notification_system/crontab

@@ -1,6 +1,12 @@
 .git
 .gitignore
 .gitattributes
+.vscode
+.dockerignore
+Dockerfile
+
+files.json
+sensors.json
 emails_to_send.txt
 
 __pycache__

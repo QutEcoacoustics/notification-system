@@ -2,6 +2,7 @@ language: python
 python:
   - "3.6"
 install:
+  - pip3 install --user pipenv
   - pipenv install --deploy
 script:
   - pipenv run python unit_testing.py

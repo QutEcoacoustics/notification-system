@@ -36,7 +36,10 @@ Place a `config.json` file alongside `toad_functions.py` etc with the following 
   "send_from": "\"<project name>\" <email@example.com>",
   // the path to the file in dropbox containing the receiver list
   "filename_send_to": "email_alert_list.txt",
-  "pause_duration": "3600",
+  "pause_duration": 3600,
+  // If no utc offset found in filename, then assume this utc offset (in seconds)
+  // e.g. 36000 for +10:00
+  "fallback_utc_offset": 0,
   "root_folder": ""
 }
 ```

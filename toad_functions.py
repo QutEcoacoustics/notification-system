@@ -6,14 +6,29 @@ import datetime
 import dropbox
 import sendgrid
 from dateutil import parser
+from dateutil.tz import tzoffset
 from sendgrid.helpers.mail import *
 from datetime import datetime
+from datetime import timezone
+from datetime import timedelta
+
+import re
+
+DATE_REGEX = r'.*((\d{4}-\d{2}-\d{2}-\d{6})(Z|[+-]\d+)?)-(.*)\.([a-zA-Z0-9]+)'
 
 # Get semantic information from a file in tuple format
 # datetime([0] yyyy, [1] MM, [2], dd, [3], HH, [4] MM, [5] SS), [6] sensorXX
-def parseFileInfo(filename):
-    data = [x.strip() for x in filename.split('-')]
-    return (datetime(int(data[1]), int(data[2]), int(data[3]), int(data[4][:2]), int(data[4][2:-2]), int(data[4][-2:])), data[5][:-5])
+def parseFileInfo(filename, fallback):
+    if fallback is None:
+        raise TypeError("A fallback must be provided")
+    match = re.search(DATE_REGEX, filename)
+    if match == None:
+        raise ValueError("Filename invalid, cannot parse date")
+    date = parser.isoparse(match[1])
+    if date.tzinfo == None:
+        offset = tzoffset(None, fallback)
+        date = date.replace(tzinfo=offset)
+    return (date, match[4])
 
 # Function to send notifications
 # body is the content of the email, send_to_emails is the array of emails to send to, send_from is the address to send from, sg is a SendGrid object
@@ -83,40 +98,46 @@ def getEmailsFromDropbox(email_config_file_path, dbx, debug=False, debug_content
                 break
     return send_to_emails
 
-def getNotificationsAndActivatingSensors(dropbox_file_names, file_history, sensor_history, pause_duration):
+def getNotificationsAndActivatingSensors(dropbox_file_names, file_history, sensor_history, pause_duration, fallback_utc_offset):
     # Array of tuples to store results of the upcoming search
     notifications_to_send = []
     activated_sensors = []
+
     # Check for new records by comparing against what we already have
     for entry in dropbox_file_names:
         if entry not in file_history or file_history[entry] == False:
             try:
                 # Extract semantic info from name for easy processing
-                (recorded_at, sensor) = parseFileInfo(entry)
-                # Append notification regardless of whether or not any sensor will trigger an email
-                notifications_to_send.append((entry, recorded_at, sensor))
-                # Have we seen this sensor before?
-                if sensor in sensor_history:
-                    previous_fire = parser.parse(sensor_history[sensor])
-                    elapsed_time = recorded_at - previous_fire
-                    (hours, remainder) = divmod(elapsed_time.total_seconds(), pause_duration)
-                    if hours >= 1:
-                        # If the sensor has already fired within the last hour, don't notify yet - we'll catch it in the future
-                        # Otherwise, append it to the list to the list to ensure we send a bundled notification now
-                        if not sensor in activated_sensors:
-                            activated_sensors.append(sensor)
-                else:
-                    # Brand new sensor, add it to the list
+                (recorded_at, sensor) = parseFileInfo(entry, fallback_utc_offset)
+            except Exception as e:
+                print(f"Could not process file name {entry}: " + str(e))
+                pass # Malformed filename, don't worry about it
+
+            # Append notification regardless of whether or not any sensor will trigger an email
+            notifications_to_send.append((entry, recorded_at, sensor))
+            # Have we seen this sensor before?
+            if sensor in sensor_history:
+                previous_fire = parser.isoparse(sensor_history[sensor])
+                assert previous_fire.tzinfo != None, "Corrupt sensors.json, a date is missing it's UTC offset"
+                elapsed_time = recorded_at - previous_fire
+                (quotient, remainder) = divmod(elapsed_time.total_seconds(), pause_duration)
+                if quotient >= 1:
+                    # If the sensor has already fired within the last hour, don't notify yet - we'll catch it in the future
+                    # Otherwise, append it to the list to the list to ensure we send a bundled notification now
                     if not sensor in activated_sensors:
                         activated_sensors.append(sensor)
-            except:
-                pass # Malformed filename, don't worry about it
+            else:
+                # Brand new sensor, add it to the list
+                if not sensor in activated_sensors:
+                    activated_sensors.append(sensor)
+
     return (notifications_to_send, activated_sensors)
 
-def updateState(notifications_to_send, activated_sensors, file_history, sensor_history):
+def updateState(notifications_to_send, activated_sensors, file_history, sensor_history, activation_adjustment = 0.0):
     for sensor in activated_sensors:
         # Update state for this sensor
-        sensor_history[sensor] = str(datetime.now())
+        now = datetime.now(timezone.utc) + timedelta(seconds=activation_adjustment)
+        sensor_history[sensor] = now.isoformat()
     # We're only updating files if a notification was sent
     if len(activated_sensors) > 0:
         for notification in notifications_to_send:

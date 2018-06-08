@@ -5,6 +5,7 @@ import requests
 import datetime
 import dropbox
 import sendgrid
+import platform
 from dateutil import parser
 from dateutil.tz import tzoffset
 from sendgrid.helpers.mail import *
@@ -35,6 +36,8 @@ def parseFileInfo(filename, fallback):
 # returns true if everything worked.
 def sendEmail(body, send_to_emails, send_from, sg):
     completed_well = False
+    host = platform.node() or "(unknown)"
+    
     # Send emails
     for recipient in send_to_emails:
         # Prepare the email
@@ -42,24 +45,35 @@ def sendEmail(body, send_to_emails, send_from, sg):
         to_email = Email(recipient)
         subject = 'Suspicious Recordings from Sensors'
         # Email Copy
-        email_html_copy = """
+        email_html_copy = f"""
         <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
         <html xmlns="http://www.w3.org/1999/xhtml">
          <head>
           <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-          <title>""" + subject + """</title>
+          <title> { subject } </title>
           <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-         </head><body>""" + body + """</body>
+         </head>
+         <body>
+            { body }
+            <br/>
+            <br/>
+            <br/>
+            <p>
+                <small style="font-size: 7pt;color:#ccc;">
+                    Sent from { host }
+                </small>
+            </p>
+        </body>
         </html>
         """
-        content = Content("text/html", body)
+        content = Content("text/html", email_html_copy)
         mail = Mail(from_email, subject, to_email, content)
         # Send the email
         response = sg.client.mail.send.post(request_body=mail.get())
         # Check the response and return true if success (any HTTP code starting with 2)
-        if str(response.status_code).startswith('2'):
-            completed_well = True
-            break
+        completed_well = str(response.status_code).startswith('2')
+        print(f"email sent to '{recipient}' was { '' if completed_well else ' NOT '} successful")
+
     # Indicate whether everything worked as expected
     return completed_well
 
@@ -166,9 +180,8 @@ def sendNotifications(dropbox_files, notifications_to_send, activated_sensors, s
                     email_body = email_body + "<p><a href=\"" + dbx.files_get_temporary_link(db_path).link + "\">" + filename + "</a></p>"
         # Send the group notification
         if (not debug):
-            sendEmail(email_body, send_to_emails, send_from, sg)
-        print(send_to_emails)
-        print("Notification sent to subscribers")
+            success = sendEmail(email_body, send_to_emails, send_from, sg)
+        print("Notification sent to subscribers was " + ("successful" if success else "not successful") )
         return True
     else:
         return False

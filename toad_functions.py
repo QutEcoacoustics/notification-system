@@ -160,6 +160,25 @@ def updateState(notifications_to_send, activated_sensors, file_history, sensor_h
     # Return the updated state
     return (file_history, sensor_history)
 
+def getSharedLink(dbx, db_path):
+    sharedLink = None
+    try:
+        # attempt to get a shared link - we can only do this once per path
+        sharedLink = dbx.sharing_create_shared_link_with_settings(db_path)
+    except dropbox.exceptions.ApiError as apiError:
+        # if the error was a duplicate shared link
+        if apiError.error.is_shared_link_already_exists():
+            # then try and retrieve link.
+            # we can only get all shared links for a path!
+            # we assume the first one is valid, and that this app created it,
+            #   and thus it has public accessibility!
+            allLinks = dbx.sharing_get_shared_links(db_path).links
+            sharedLink = allLinks[0]
+            print("successfully retrieved existing shared link for " + db_path)
+        else:
+            raise
+    return sharedLink.url
+
 def sendNotifications(dropbox_files, notifications_to_send, activated_sensors, send_to_emails, send_from, sg, dbx, debug=False):
     # If we have activated sensors, group notifications by sensor and send a bundled email now
     if len(activated_sensors) > 0:
@@ -177,7 +196,7 @@ def sendNotifications(dropbox_files, notifications_to_send, activated_sensors, s
 
                 if sensor == _sensor:
                     # Add the file to the email
-                    email_body = email_body + "<p><a href=\"" + dbx.sharing_create_shared_link_with_settings(db_path).url + "\">" + filename + "</a></p>"
+                    email_body = email_body + "<p><a href=\"" + getSharedLink(dbx, db_path) + "\">" + filename + "</a></p>"
         # Send the group notification
         if (not debug):
             success = sendEmail(email_body, send_to_emails, send_from, sg)

@@ -44,6 +44,9 @@ Place a `config.json` file alongside `toad_functions.py` etc with the following 
 }
 ```
 
+The first argument to `toad_notification_system.py` is the config path. Use that
+to override the default config file path.
+
 Note that `email_alert_list.txt` is a file in the same Dropbox directory containing a newline-delimited list of emails to send notifications to.
 `pause_duration` is the number of seconds to wait before letting a sensor trigger another notification after it has previously triggered one.
 `root_folder` is the location of the Dropbox directory where the files are stored.

@@ -177,7 +177,7 @@ def sendNotifications(dropbox_files, notifications_to_send, activated_sensors, s
 
                 if sensor == _sensor:
                     # Add the file to the email
-                    email_body = email_body + "<p><a href=\"" + dbx.files_get_temporary_link(db_path).link + "\">" + filename + "</a></p>"
+                    email_body = email_body + "<p><a href=\"" + dbx.sharing_create_shared_link_with_settings(db_path).url + "\">" + filename + "</a></p>"
         # Send the group notification
         if (not debug):
             success = sendEmail(email_body, send_to_emails, send_from, sg)

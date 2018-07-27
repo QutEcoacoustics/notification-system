@@ -3,6 +3,7 @@ A simple python and cron combination to send alerts when files are added to a dr
 
 
 [![Build Status](https://travis-ci.org/QutEcoacoustics/notification-system.svg?branch=master)](https://travis-ci.org/QutEcoacoustics/notification-system)
+[![](https://images.microbadger.com/badges/version/qutecoacoustics/notification-system.svg)](https://microbadger.com/images/qutecoacoustics/notification-system "Get your own version badge on microbadger.com")
 
 
 ## Development

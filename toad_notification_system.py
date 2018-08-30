@@ -50,7 +50,6 @@ dbx.users_get_current_account()
 
 # Pull list of files in Dropbox
 dropbox_files = toad_functions.getFilesFromDropbox(dbx, root_folder=system_configuration['root_folder'])
-dropbox_file_names = [entry.name for entry in dropbox_files]
 
 # Get list of emails to send to by scanning Dropbox
 send_to_emails = toad_functions.getEmailsFromDropbox(system_configuration["filename_send_to"], dbx, debug=False)
@@ -59,8 +58,8 @@ send_to_emails = toad_functions.getEmailsFromDropbox(system_configuration["filen
 now = datetime.now(timezone.utc)
 pause_duration = system_configuration["pause_duration"]
 fallback_utc_offset = timedelta(seconds=(system_configuration["fallback_utc_offset"]))
-(notifications_to_send, sensors_status) = toad_functions.getNotificationsAndActivatingSensors(dropbox_file_names, file_history,
-    sensor_history, pause_duration, fallback_utc_offset, now)
+(notifications_to_send, sensors_status) = toad_functions.getNotificationsAndActivatingSensors(
+    dropbox_files,file_history, sensor_history, pause_duration, fallback_utc_offset, now)
 
 # in a new instance, when there are no history files available (files.json and sensors.json)
 # we modify the sensor activation date to now - pause_duration. This way we alert

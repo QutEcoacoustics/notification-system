@@ -4,12 +4,13 @@ import sys
 import json
 import requests
 import datetime
-import dropbox
-import sendgrid
+from datetime import datetime
+from datetime import timezone
 from dateutil import parser
 from datetime import timedelta
-from toad_functions import *
-from sendgrid.helpers.mail import *
+import dropbox
+import sendgrid
+import toad_functions
 
 # Load configuration
 config_path = "./config.json"
@@ -48,26 +49,31 @@ dbx = dropbox.Dropbox(system_configuration['dropbox_api_key'])
 dbx.users_get_current_account()
 
 # Pull list of files in Dropbox
-dropbox_files = getFilesFromDropbox(dbx, root_folder=system_configuration['root_folder'])
+dropbox_files = toad_functions.getFilesFromDropbox(dbx, root_folder=system_configuration['root_folder'])
 dropbox_file_names = [entry.name for entry in dropbox_files]
 
 # Get list of emails to send to by scanning Dropbox
-send_to_emails = getEmailsFromDropbox(system_configuration["filename_send_to"], dbx, debug=False)
+send_to_emails = toad_functions.getEmailsFromDropbox(system_configuration["filename_send_to"], dbx, debug=False)
 
 # Search for new notifications, in the context of file and sensor history
+now = datetime.now(timezone.utc)
 pause_duration = system_configuration["pause_duration"]
 fallback_utc_offset = timedelta(seconds=(system_configuration["fallback_utc_offset"]))
-(notifications_to_send, activated_sensors) = getNotificationsAndActivatingSensors(dropbox_file_names, file_history, sensor_history, pause_duration, fallback_utc_offset)
+(notifications_to_send, sensors_status) = toad_functions.getNotificationsAndActivatingSensors(dropbox_file_names, file_history,
+    sensor_history, pause_duration, fallback_utc_offset, now)
 
 # in a new instance, when there are no history files available (files.json and sensors.json)
-# we modify the sensor activation date to now - pause_duration
-activation_adjustment = 0.0
+# we modify the sensor activation date to now - pause_duration. This way we alert
+# for any files in the next block, but for none of the previous files
 if new_instance:
     print("New instance detected. Sensor activation date is shifted back " + str(pause_duration))
     activation_adjustment = -1 * pause_duration
+    # Activation adjustment allows us to tweak when a sensor was activated.
+    # Useful for new deploys without past history files available.
+    now = now + timedelta(seconds=activation_adjustment)
 
 # Update state
-(file_history, sensor_history) = updateState(notifications_to_send, activated_sensors, file_history, sensor_history, activation_adjustment)
+(file_history, sensor_history, send_notifications) = toad_functions.updateState(notifications_to_send, sensors_status, file_history, sensor_history, now)
 file_history_io = open("files.json", "w")
 sensor_history_io = open("sensors.json", "w")
 json.dump(file_history, file_history_io)
@@ -75,16 +81,18 @@ json.dump(sensor_history, sensor_history_io)
 file_history_io.close()
 sensor_history_io.close()
 
-# wipe out all activated sensors for and notification for new instance initial setup
-# so we don't send a notification for every previous file - this should only happen
-# when there are no history files available (files.json and sensors.json)
+# Do not send notifications for new instance initial setup so we don't send a
+#  notification for every previous file - this should only happen when there are
+#  no history files available (files.json and sensors.json are empty).
 if new_instance:
     print("New instance detected. Squashing all notifications. New notifications will work from next script run")
-    activated_sensors = []
-    notifications_to_send = []
+    send_notifications = False
 
 # Send Notifications
-sendNotifications(dropbox_files, notifications_to_send, activated_sensors, send_to_emails, bot_address, sg, dbx, debug=False)
+if send_notifications:
+    href_function = lambda path: toad_functions.getSharedLink(dbx, path)
+    body = toad_functions.formatNotifications(notifications_to_send, sensors_status, href_function)
+    toad_functions.sendEmail(body, send_to_emails, bot_address, sg)
 
 # Done
 print("Script finished")

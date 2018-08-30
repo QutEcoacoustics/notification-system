@@ -200,7 +200,7 @@ def formatNotifications(notifications_to_send, sensors_status, href_function):
 # Function to send notifications
 # body is the content of the email, send_to_emails is the array of emails to send to, send_from is the address to send from, sg is a SendGrid object
 # returns true if everything worked.
-def sendEmail(body, send_to_emails, send_from, sg):
+def sendEmail(body, instance_name, send_to_emails, send_from, sg):
     # We assume this function is only called if notifications should be sent.
     completed_well = False
     host = platform.node() or "(unknown)"
@@ -227,7 +227,7 @@ def sendEmail(body, send_to_emails, send_from, sg):
             <br/>
             <p>
                 <small style="font-size: 7pt;color:#ccc;">
-                    Sent from { host }
+                    Sent from { instance_name } ({ host })
                 </small>
             </p>
         </body>

@@ -91,7 +91,8 @@ if new_instance:
 if send_notifications:
     href_function = lambda path: toad_functions.getSharedLink(dbx, path)
     body = toad_functions.formatNotifications(notifications_to_send, sensors_status, href_function)
-    toad_functions.sendEmail(body, send_to_emails, bot_address, sg)
+    instance_name = system_configuration["name"]
+    toad_functions.sendEmail(body, instance_name, send_to_emails, bot_address, sg)
 
 # Done
 print("Script finished")

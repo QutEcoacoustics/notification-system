@@ -254,6 +254,16 @@ class MyTest(unittest.TestCase):
       ]
 
       self.step_runner(trigger_times)
+        
+    def test_sensors_should_not_activate_with_no_files(self):
+      # sensors should not activate for no reason
+
+      trigger_times = [
+        {"date": "2018-08-12T19:10:00+10:00", "activated": 0, "notifications": 0, "send_notifications": False, "new_files": [], "expected_history": {}, "sensor_last_update": "2018-08-12T18:00:00+10:00"},
+        {"date": "2018-08-12T20:10:00+10:00", "activated": 0, "notifications": 0, "send_notifications": False,"new_files": [], "expected_history": {}, "sensor_last_update": "2018-08-12T18:00:00+10:00"},
+      ]
+
+      self.step_runner(trigger_times)
 
     #
     # Helper methods

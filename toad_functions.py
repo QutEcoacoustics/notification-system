@@ -95,7 +95,8 @@ def getNotificationsAndActivatingSensors(dropbox_files, file_history,
         # how long between the last sensor fire and now
         elapsed_time = datetime_now - previous_fire
         (quotient, _remainder) = divmod(elapsed_time.total_seconds(), pause_duration)
-        sensors_status[sensor_name] = SensorState.ACTIVATED if quotient >= 1 else SensorState.PAUSED
+        # keep sensors still within timeout window paused, otherwise set state to idle
+        sensors_status[sensor_name] = SensorState.IDLE if quotient >= 1 else SensorState.PAUSED
 
     # Check for new records by comparing against what we already have
     for entry in dropbox_files:
@@ -106,7 +107,7 @@ def getNotificationsAndActivatingSensors(dropbox_files, file_history,
                 (recorded_at, sensor_name) = parseFileInfo(filename, fallback_utc_offset)
             except Exception as e:
                 print(f"Could not process file name {filename}: " + str(e))
-                pass # Malformed filename, don't worry about it
+                continue # Malformed filename, don't worry about it
 
             # Append notification regardless of whether or not any sensor will trigger an email
             notifications_to_send.append((entry, recorded_at, sensor_name))
@@ -182,12 +183,17 @@ def formatNotifications(notifications_to_send, sensors_status, href_function):
             continue
 
         # Process for this sensor
-        email_body = email_body + "<h2>Suspicious recordings from " + sensor_name + "</h2>"
+        sensor_header = f"<h2>Suspicious recordings from { sensor_name }</h2>"
+        header_added = False
         for notification in notifications_to_send:
             (entry, _recorded_at, notification_sensor) = notification
             if sensor_name != notification_sensor:
                 continue
 
+            if not header_added:
+                email_body += sensor_header
+                header_added = True
+            
             # get the drop box file name, get the path_lower to use for get_temporary_link
             filename = entry.name
             db_path = entry.path_lower

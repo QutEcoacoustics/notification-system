@@ -41,7 +41,15 @@ Place a `config.json` file alongside `toad_functions.py` etc with the following 
   // If no utc offset found in filename, then assume this utc offset (in seconds)
   // e.g. 36000 for +10:00
   "fallback_utc_offset": 0,
-  "root_folder": ""
+  // the folder containing uploaded audio files. Must be supplied.
+  "root_folder": "/instance/audio",
+  // the folder containing log folders. optional
+  "log_folder": "/instance/logs",
+  // when to update the status report
+  "update_status_report_at": ["00:00", "12:00"],
+  // a name that can be used to identify the instance that sent the notification
+  // in an email
+  "name": "Testing notifier"
 }
 ```
 

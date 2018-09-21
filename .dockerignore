@@ -8,5 +8,8 @@ Dockerfile
 files.json
 sensors.json
 emails_to_send.txt
+sensors_status.json
+sensors_status.html
+test
 
 __pycache__

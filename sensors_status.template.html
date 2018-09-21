@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Sensor status page</title>
+  </head>
+  <body>
+  
+    <h1>Sensor status page</h1>
+    
+    <h2>{{name}} deployment</h2>
+    <p>Report generated on {{report_date}}</p>
+    
+    <p>
+      Shows the last activation time for each sensor and the health checks for 
+      the report generation date and the 4 days previous.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Sensor name</th>
+          <th>Last activation</th>
+          {% for date in dates %}
+            <th>{{ date }}</th>
+          {% endfor %} 
+        </tr>
+      </thead>
+      <tbody>
+        {% for name, sensor in sensors.items() %}
+          <tr>
+            <td>{{name}}</td>
+            <td>{{ sensor.last_activation if sensor.last_activation else "🤷‍️"  }}</td>
+            {% for date in dates %}
+              {% set dateKey = date %}
+              {% set logs = sensor.logs[dateKey] %}
+              <td>
+                {% if logs %}
+                  {% set upDown = logs | groupby(2) %}
+                  
+                  {% set up = logs | selectattr(2, 'equalto', 'up') | list | length %}
+                  {% set down =logs | selectattr(2, 'equalto', 'down') | list | length  %}
+                  {% if up == down %}
+                    <p title="{{ up }} up logs, {{ down }} down logs">✅</p>
+                  {% else %}
+                    <p title="{{ up }} up logs, {{ down }} down logs">
+                      ❓
+                    </p>
+                    <span>{{ up }}⬆</span>
+                    <span>{{ down }}⬇</span>
+                  {% endif %}
+                {% else %}
+                  <p title="No logs for this date from this sensor">❌</p>
+                {% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  </body>
+</html>

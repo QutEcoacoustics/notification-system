@@ -7,15 +7,15 @@ import dropbox
 import sendgrid
 import platform
 from dateutil import parser
-from dateutil.tz import tzoffset
 from enum import Enum
 from sendgrid.helpers.mail import Email, Mail, Content
 from datetime import datetime
 from datetime import timezone
 from datetime import timedelta
-
+from pathlib import PurePosixPath
 import re
 
+_LOG_FOLDER_REGEX = r'[/\S]+(sensor\d{1,2})'
 _DATE_REGEX = r'.*((\d{4}-\d{2}-\d{2}-\d{6})(Z|[+-]\d+)?)-(.*)\.([a-zA-Z0-9]+)'
 
 class SensorState(Enum):
@@ -43,7 +43,7 @@ def parseFileInfo(filename, fallback):
         raise ValueError("Filename invalid, cannot parse date")
     date = parser.isoparse(match[1])
     if date.tzinfo == None:
-        offset = tzoffset(None, fallback)
+        offset = timezone(fallback)
         date = date.replace(tzinfo=offset)
     return (date, match[4])
 
@@ -56,7 +56,7 @@ def getFilesFromDropbox(dbx, root_folder=''):
         for entry in fetched_files.entries:
             dropbox_files.append(entry)
         if fetched_files.has_more:
-            fetched_files = dbx.files_list_folder_continue(fetched_files.cursor).entries
+            fetched_files = dbx.files_list_folder_continue(fetched_files.cursor)
         else:
             finished_looping = True
     return dropbox_files
@@ -250,3 +250,68 @@ def sendEmail(body, instance_name, send_to_emails, send_from, sg):
     # Indicate whether everything worked as expected
     print("Notification sent to subscribers was " + ("successful" if completed_well else "not successful") )
     return completed_well
+
+def closeToTimeOfDay(target, times, threshold_seconds = 300):
+    threshold = timedelta(seconds=threshold_seconds)
+
+    for time in times:
+        #returns a datetime for today, with the time components parsed as per the input
+        check_time = parser.parse(time, default=target)
+        within_threshold = abs(target - check_time) < threshold
+        if within_threshold:
+            return True
+    
+    return False
+
+def filterSensorDirs(dropbox_files, exclude_paths):
+    for entry in dropbox_files:
+        path = entry.path_lower
+        # filter excluded
+        if path in exclude_paths:
+            continue
+
+        # test if it matches our log dir pattern
+        match = re.search(_LOG_FOLDER_REGEX, path)
+        if match == None:
+            continue
+        
+        # construct a path to where the logs folder should be
+        yield (str(PurePosixPath(path, "logs")), match[1])
+        
+def filterGroupLogFiles(dropbox_files, report_date, limit, fallback_utc_offset):
+    results = {}
+    for entry in dropbox_files:
+        try:
+            # Extract semantic info from name for easy processing
+            (log_date, status) = parseFileInfo(entry.name, fallback_utc_offset)
+        except Exception as e:
+            print(f"Could not process file name {entry.name}: " + str(e))
+            continue # Malformed filename, don't worry about it
+        # exclude logs older (or newer) than limit
+        if limit != None and abs(report_date - log_date) > limit:
+            continue
+
+        # group the results by day
+        day = log_date.date().isoformat()
+        if day not in results:
+            results[day] = []
+        results[day].append((entry.path_lower, log_date.isoformat(), status))
+
+    return results
+
+def templateReport(template, full_report, target_date, report_days = 5):
+    # generate a date range 
+    dates = list(map(lambda i: (target_date - timedelta(days=i)).isoformat(), range(0, 5)))
+    additional_context = {"dates": dates}
+    from jinja2 import Template
+    compiled_template = Template(template)
+    return compiled_template.render({**full_report, **additional_context})
+
+def uploadFileToDropbox(dbx, content, path):
+    content_bytes = content.encode('utf-8')
+    dbx.files_upload(content_bytes, path, dropbox.files.WriteMode.overwrite, mute=True)
+    # for debugging:
+    import posixpath
+    name = posixpath.basename(path)
+    with open(name, 'w', encoding = 'utf-8') as f:
+        f.write(content)

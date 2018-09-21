@@ -49,7 +49,8 @@ dbx = dropbox.Dropbox(system_configuration['dropbox_api_key'])
 dbx.users_get_current_account()
 
 # Pull list of files in Dropbox
-dropbox_files = toad_functions.getFilesFromDropbox(dbx, root_folder=system_configuration['root_folder'])
+root_folder = system_configuration['root_folder']
+dropbox_files = toad_functions.getFilesFromDropbox(dbx, root_folder=root_folder)
 
 # Get list of emails to send to by scanning Dropbox
 send_to_emails = toad_functions.getEmailsFromDropbox(system_configuration["filename_send_to"], dbx, debug=False)
@@ -88,11 +89,55 @@ if new_instance:
     send_notifications = False
 
 # Send Notifications
+instance_name = system_configuration["name"]
 if send_notifications:
     href_function = lambda path: toad_functions.getSharedLink(dbx, path)
     body = toad_functions.formatNotifications(notifications_to_send, sensors_status, href_function)
-    instance_name = system_configuration["name"]
     toad_functions.sendEmail(body, instance_name, send_to_emails, bot_address, sg)
+
+print("Updating sensor health")
+
+# get a list of sensor folders
+status_path = system_configuration["log_folder"]
+update_at = system_configuration["update_status_report_at"]
+
+if status_path:
+    if update_at and toad_functions.closeToTimeOfDay(now, update_at):
+        all_files = toad_functions.getFilesFromDropbox(dbx, root_folder=status_path)
+        log_dirs = toad_functions.filterSensorDirs(all_files, [root_folder])
+        # for each log dir, get logs
+        # Note: this would be an optimal async operation
+        # Note: we could run into API limitations here
+        limit = None # no limit, or you could set one timedelta(days=3)
+        all_sensors  = {}
+        for (log_dir, sensor) in log_dirs:
+            print("Downloading logs for " + log_dir)
+            log_files = toad_functions.getFilesFromDropbox(dbx, root_folder=log_dir)
+            report = toad_functions.filterGroupLogFiles(log_files, now, limit, fallback_utc_offset)
+            last_activation = None if new_instance else sensor_history.get(sensor)
+            all_sensors[sensor] = {"logs": report, "last_activation":  last_activation}
+
+        full_report = {"sensors": all_sensors, "report_date": now.isoformat(), "name": instance_name}
+        # upload the report to dropbox
+        content = json.dumps(full_report)
+        
+        report_path = status_path + "/sensors_status.json"
+        print("Uploading report to " + report_path)
+        toad_functions.uploadFileToDropbox(dbx, content, report_path)
+
+        # upload the html report viewer
+        target_date = now.date()
+        report_path = status_path + f"/sensors_status_{target_date.isoformat()}.html"
+        print("Uploading template to " + report_path)
+        with open("sensors_status.template.html", 'r', encoding = 'utf-8') as f:
+            viewer_template = f.read()
+            
+            report = toad_functions.templateReport(viewer_template, full_report, target_date)
+            toad_functions.uploadFileToDropbox(dbx, report, report_path)
+    else:
+        print("skipping status update, not close enough to update_status_report_at times")
+else:
+    print("Skipping status update, no log_folder set in config file")
 
 # Done
 print("Script finished")

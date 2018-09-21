@@ -2,27 +2,37 @@ import unittest
 import json
 import datetime
 from datetime import timedelta
+from datetime import timezone
 from toad_functions import (
   getEmailsFromDropbox, 
   getNotificationsAndActivatingSensors,
   updateState,
   parseFileInfo,
   SensorState, 
-  formatNotifications
+  formatNotifications,
+  filterSensorDirs,
+  filterGroupLogFiles,
+  closeToTimeOfDay
 )
 from dateutil import parser
 import re
 
 class FileMetadataMock():
+    MOCK_ROOT =  "/mock_path/"
 
     def __init__(self, name):
-      self._name = name
+        if isinstance(name, dict):
+            self._path_lower = name["path_lower"]
+            self._name = name["name"]
+        else:
+            self._path_lower = self.MOCK_ROOT + name
+            self._name = name
 
     @property
     def name(self): return self._name
 
     @property
-    def path_lower(self): return "/mock_path/" + self.name
+    def path_lower(self): return self._path_lower
   
     @staticmethod
     def make_files(filenames):
@@ -264,6 +274,82 @@ class MyTest(unittest.TestCase):
       ]
 
       self.step_runner(trigger_times)
+
+    def test_filter_sensor_dirs(self):
+        test_files = FileMetadataMock.make_files([
+            "toads",
+            "sensor7",
+            "sensor8",
+            "sensor9",
+            "toad",
+            "sensor0",
+            "email_alert_list.txt",
+            "script-orig.sh",
+            "sw-update-v10.sh",
+            "v10.tar",
+            "sw-update-v10-debug.sh",
+            "script.sh"])
+
+        actual = list(filterSensorDirs(test_files, FileMetadataMock.MOCK_ROOT + "toads"))
+
+        expected = [
+            (FileMetadataMock.MOCK_ROOT + "sensor7/logs", "sensor7"),
+            (FileMetadataMock.MOCK_ROOT + "sensor8/logs", "sensor8"),
+            (FileMetadataMock.MOCK_ROOT + "sensor9/logs", "sensor9"),
+            (FileMetadataMock.MOCK_ROOT + "sensor0/logs", "sensor0")]
+        self.assertEqual(actual, expected)
+
+    def test_group_log_files(self):
+        with open("test/fixtures/log_listing.json") as f:
+            log_listing = FileMetadataMock.make_files(json.load(f)["entries"])
+
+        tz = timezone(timedelta(hours=10))
+        report_date = datetime.datetime(2018, 8, 28, 12, 0, tzinfo=tz)
+        limit = timedelta(days=3)
+        fallback_utc_offset = timedelta(hours=10)
+
+        # test limitless reporting
+        actual = filterGroupLogFiles(log_listing, report_date, None, fallback_utc_offset)
+        self.assertEqual(len(actual), 76)
+
+        # limit to last n days
+        actual = filterGroupLogFiles(log_listing, report_date, limit, fallback_utc_offset)
+
+        # its just before the report date of 12:01, so -3days will include 3 previous
+        # reports, and +3days will include today and 2 future reports
+        self.assertEqual(len(actual), 6)
+        expected_dates = list(map(lambda i:  datetime.date(2018, 8, i).isoformat(), range(25, 31)))
+        self.assertCountEqual(actual.keys(), expected_dates)
+        
+        expected_reports = zip(expected_dates, [4, 1, 6, 1, 1, 1], [1, 1, 1, 1, 1, 1])
+        for (day, up_count, down_count) in expected_reports:
+            log_entries = actual[day]
+            # one up, one down, entry for each day (when there isn't a fault with the sensor!)
+            self.assertEqual(len(log_entries), up_count + down_count)
+            self.assertEqual(len(list(filter(lambda entry: entry[2] == "up", log_entries))), up_count)
+            self.assertEqual(len(list(filter(lambda entry: entry[2] == "down", log_entries))), down_count)
+
+    def test_close_to_time_of_day(self):
+      times = ["12:00", "15:00"]
+
+      test_cases = [
+        ("2018-08-12T15:00:00", True),
+        ("2018-08-12T15:05:00", False),
+        ("2018-08-12T15:04:00", True),
+        ("2018-08-12T14:00:00", False),
+        ("2018-08-12T14:55:00", False),
+        ("2018-08-12T14:55:01", False),
+        ("2018-08-12T15:00:00+10:00", True),
+        ("2018-08-12T15:05:00+10:00", False),
+        ("2018-08-12T15:04:00+10:00", True),
+        ("2018-08-12T14:00:00+10:00", False),
+        ("2018-08-12T14:55:00+10:00", False),
+        ("2018-08-12T14:55:01+10:00", False),
+      ]
+
+      for (test_now_string, expected) in test_cases:
+        test_now = parser.parse(test_now_string)
+        self.assertEqual(closeToTimeOfDay(test_now, times), expected)
 
     #
     # Helper methods

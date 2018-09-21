@@ -1,1 +1,2 @@
+# Every 5 minutes
 0/5 * * * * pipenv run python3 /notification_system/toad_notification_system.py /config/config.json

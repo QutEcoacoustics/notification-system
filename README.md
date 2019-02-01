@@ -38,6 +38,11 @@ Place a `config.json` file alongside `toad_functions.py` etc with the following 
   // the path to the file in dropbox containing the receiver list
   "filename_send_to": "email_alert_list.txt",
   "pause_duration": 3600,
+  // An array of (time start, time end) tuples for allowed notification times
+  // The  default if omitted is `[["00:00", "24:00"]]`.
+  // The times are interpreted against the local time of the matched file,
+  // parsed from it's filename.
+  "whitelist_times_of_day" : [ ["20:00", "24:00"], ["00:00", "04:00"]],
   // If no utc offset found in filename, then assume this utc offset (in seconds)
   // e.g. 36000 for +10:00
   "fallback_utc_offset": 0,

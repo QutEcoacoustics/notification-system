@@ -12,7 +12,9 @@ from toad_functions import (
   formatNotifications,
   filterSensorDirs,
   filterGroupLogFiles,
-  closeToTimeOfDay
+  closeToTimeOfDay,
+  parse_whitelist_times,
+  time_ranges_contain_time_from_date
 )
 from dateutil import parser
 import re
@@ -40,6 +42,8 @@ class FileMetadataMock():
 
 
 class MyTest(unittest.TestCase):
+    default_time_whitelist = parse_whitelist_times(None)
+
     # There is one file in the folder, and the records indicate it has landed more than an hour after the
     # sensor that recorded it was last responsible for an automated mail
     # A notification should be sent
@@ -145,7 +149,7 @@ class MyTest(unittest.TestCase):
         file_history = json.loads(self.scenario1_file_history)
         sensor_history = json.loads(self.scenario1_sensors)
         now =  parser.isoparse(self.scenario1_now)
-        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now)
+        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now, self.default_time_whitelist)
         self.assert_notifications(actual, 1, 1, 1)
         
         # Test state update. This should always result in zero activated sensors, and if a notification *was* sent,
@@ -153,7 +157,7 @@ class MyTest(unittest.TestCase):
         (file_history, sensor_history, send_notifications) = updateState(*actual, file_history, sensor_history, now)
         self.assertEqual(send_notifications, True)
 
-        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now)
+        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now, self.default_time_whitelist)
         self.assert_notifications(actual, 1, 0, 0)
 
     def test_scenario_2(self):
@@ -161,7 +165,7 @@ class MyTest(unittest.TestCase):
         file_history = json.loads(self.scenario2_file_history)
         sensor_history = json.loads(self.scenario2_sensors)
         now = parser.isoparse(self.scenario2_now)
-        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now)
+        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now, self.default_time_whitelist)
         self.assert_notifications(actual, 1, 0, 1)
         
         # Test state update. This should always result in zero activated sensors, and if a notification *was* sent,
@@ -169,7 +173,7 @@ class MyTest(unittest.TestCase):
         (file_history, sensor_history, send_notifications) = updateState(*actual, file_history, sensor_history, now)
         self.assertEqual(send_notifications, False)
 
-        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now)
+        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now, self.default_time_whitelist)
         self.assert_notifications(actual, 1, 0, 1)
 
     def test_scenario_3(self):
@@ -177,7 +181,7 @@ class MyTest(unittest.TestCase):
         file_history = json.loads(self.scenario3_file_history)
         sensor_history = json.loads(self.scenario3_sensors)
         now = parser.isoparse(self.scenario3_now)
-        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now)
+        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now, self.default_time_whitelist)
         self.assert_notifications(actual, 1, 1, 2)
 
         # Test state update. This should always result in zero activated sensors, and if a notification *was* sent,
@@ -185,7 +189,7 @@ class MyTest(unittest.TestCase):
         (file_history, sensor_history, send_notifications) = updateState(*actual, file_history, sensor_history, now)
         self.assertEqual(send_notifications, True)
 
-        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now)
+        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now, self.default_time_whitelist)
         self.assert_notifications(actual, 1, 0, 0)
 
     def test_scenario_4(self):
@@ -193,7 +197,7 @@ class MyTest(unittest.TestCase):
         file_history = json.loads(self.scenario4_file_history)
         sensor_history = json.loads(self.scenario4_sensors)
         now = parser.isoparse(self.scenario4_now)
-        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now)
+        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now, self.default_time_whitelist)
         self.assert_notifications(actual, 2, 1, 2)
 
         # Test state update. This should always result in zero activated sensors, and if a notification *was* sent,
@@ -201,7 +205,7 @@ class MyTest(unittest.TestCase):
         (file_history, sensor_history, send_notifications) = updateState(*actual, file_history, sensor_history, now)
         self.assertEqual(send_notifications, True)
 
-        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now)
+        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now, self.default_time_whitelist)
         self.assert_notifications(actual, 2, 0, 0)
 
     def test_scenario_5(self):
@@ -209,7 +213,7 @@ class MyTest(unittest.TestCase):
         file_history = json.loads(self.scenario5_file_history)
         sensor_history = json.loads(self.scenario5_sensors)
         now = parser.isoparse(self.scenario5_now)
-        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now)
+        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now, self.default_time_whitelist)
         self.assert_notifications(actual, 2, 0, 2)
 
         # Test state update. This should always result in zero activated sensors, and if a notification *was* sent,
@@ -217,7 +221,7 @@ class MyTest(unittest.TestCase):
         (file_history, sensor_history, send_notifications) = updateState(*actual, file_history, sensor_history, now)
         self.assertEqual(send_notifications, False)
 
-        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now)
+        actual = getNotificationsAndActivatingSensors(files, file_history, sensor_history, 3600, timedelta(hours=0), now, self.default_time_whitelist)
         self.assert_notifications(actual, 2, 0, 2)
         
     def test_flush_events(self):
@@ -271,6 +275,22 @@ class MyTest(unittest.TestCase):
       trigger_times = [
         {"date": "2018-08-12T19:10:00+10:00", "activated": 0, "notifications": 0, "send_notifications": False, "new_files": [], "expected_history": {}, "sensor_last_update": "2018-08-12T18:00:00+10:00"},
         {"date": "2018-08-12T20:10:00+10:00", "activated": 0, "notifications": 0, "send_notifications": False,"new_files": [], "expected_history": {}, "sensor_last_update": "2018-08-12T18:00:00+10:00"},
+      ]
+
+      self.step_runner(trigger_times)
+
+            
+    def test_whitelist_times_should_be_respected(self):
+      # files that do not occur in whitelist should be never reported
+
+      f1 = "toad-2018-08-12-190631-sensor36.flac"
+      f2 = "toad-2018-08-13-120000-sensor36.flac"
+      f3 = "toad-2018-08-13-200236-sensor36.flac"
+
+      trigger_times = [
+        {"date": "2018-08-12T19:10:00+10:00", "activated": 1, "notifications": 1, "send_notifications": True, "new_files": [f1], "expected_history": {f1: True}, "sensor_last_update": "2018-08-12T19:10:00+10:00"},
+        {"date": "2018-08-13T12:05:00+10:00", "activated": 0, "notifications": 1, "send_notifications": False,"new_files": [f2], "expected_history": {f1: True, f2: None}, "sensor_last_update": "2018-08-12T19:10:00+10:00"},
+        {"date": "2018-08-13T20:10:00+10:00", "activated": 1, "notifications": 1, "send_notifications": True,"new_files": [f3], "expected_history": {f1: True, f2: None, f3: True}, "sensor_last_update": "2018-08-13T20:10:00+10:00"},
       ]
 
       self.step_runner(trigger_times)
@@ -351,6 +371,53 @@ class MyTest(unittest.TestCase):
         test_now = parser.parse(test_now_string)
         self.assertEqual(closeToTimeOfDay(test_now, times), expected)
 
+    def test_parse_whitelist_times(self):
+        test_cases = [
+            None,
+            [],
+            [["00:00", "24:00"]],
+            [["20:00", "24:00"], ["00:00", "05:30"]],
+        ]
+
+        expected = [
+            [(timedelta(days=0), timedelta(days=1))],
+            [(timedelta(days=0), timedelta(days=1))],
+            [(timedelta(days=0), timedelta(days=1))],
+            [(timedelta(hours=20), timedelta(days=1)), ((timedelta(days=0), timedelta(hours=5, minutes=30)))],
+        ]
+
+        for (input, expected) in zip(test_cases, expected):
+            actual = parse_whitelist_times(input)
+            self.assertEqual(expected, actual, f"test case: {input}")
+
+    def test_time_ranges_contain_time_from_date(self):
+        test_cases_whitelist = [
+            [(timedelta(days=0), timedelta(days=1))],
+            [(timedelta(days=0), timedelta(days=1))],
+            [(timedelta(days=0), timedelta(days=1))],
+            [(timedelta(hours=20), timedelta(days=1)), (timedelta(days=0), timedelta(hours=5, minutes=30))],
+            [(timedelta(hours=20), timedelta(days=1)), (timedelta(days=0), timedelta(hours=5, minutes=30))],
+            [(timedelta(hours=20), timedelta(days=1)), (timedelta(days=0), timedelta(hours=5, minutes=30))],
+            [(timedelta(hours=20), timedelta(days=1)), (timedelta(days=0), timedelta(hours=5, minutes=30))],
+            [(timedelta(hours=20), timedelta(days=1)), (timedelta(days=0), timedelta(hours=5, minutes=30))],
+        ]
+
+        test_cases_dates = [
+            ("2018-08-12T14:55:01", True),
+            ("2018-08-12T23:59:59", True),
+            ("2018-08-12T00:00:00", True),
+            ("2018-08-12T14:55:01", False),
+            ("2018-08-12T20:00:00", True),
+            ("2018-08-12T00:00:00", True),
+            ("2018-08-12T05:30:00", False),
+            ("2018-08-12T12:00:00", False),
+        ]
+
+        for (whitelist, (date, expected)) in zip(test_cases_whitelist, test_cases_dates):
+            date = parser.parse(date)
+            actual = time_ranges_contain_time_from_date(whitelist, date)
+            self.assertEqual(expected, actual, f"failed for `{date}`")
+
     #
     # Helper methods
     #
@@ -365,6 +432,10 @@ class MyTest(unittest.TestCase):
       db_files = []
       file_history = {}
       sensor_history = {"sensor36": "2018-08-12T18:00:00+10:00"}
+      times_whitelist =  [
+          (timedelta(hours=18), timedelta(days=1)), 
+          (timedelta(days=0), timedelta(hours=10))
+          ]
       for step in steps:
         now = parser.isoparse(step["date"])
 
@@ -374,7 +445,7 @@ class MyTest(unittest.TestCase):
         expected_history = step["expected_history"]
         sensor_last_update = step["sensor_last_update"]
 
-        actual = getNotificationsAndActivatingSensors(db_files, file_history, sensor_history, 3600, timedelta(hours=10), now)
+        actual = getNotificationsAndActivatingSensors(db_files, file_history, sensor_history, 3600, timedelta(hours=10), now, times_whitelist)
         self.assert_notifications(actual, 1, step["activated"], step["notifications"])
 
         (file_history, sensor_history, send_notifications) = updateState(*actual, file_history, sensor_history, now)

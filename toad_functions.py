@@ -6,6 +6,7 @@ import datetime
 import dropbox
 import sendgrid
 import platform
+import pytimeparse
 from dateutil import parser
 from enum import Enum
 from sendgrid.helpers.mail import Email, Mail, Content
@@ -82,8 +83,29 @@ def getEmailsFromDropbox(email_config_file_path, dbx, debug=False, debug_content
                 break
     return send_to_emails
 
+def parse_whitelist_times(whitelist):
+    if whitelist is None or len(whitelist) == 0:
+        return [(timedelta(0), timedelta(hours = 24))]
+    elif type(whitelist) is list:
+          return list(
+              (
+                timedelta(seconds=pytimeparse.parse(min, granularity='minutes')),
+                timedelta(seconds=pytimeparse.parse(max, granularity='minutes'))
+              )
+              for [min, max] in whitelist)
+    else:
+        raise ValueError(f"whitelist value was not an list, was a {type(whitelist)} ({whitelist})")       
+        
+
+def time_ranges_contain_time_from_date(bounds_list, date_time):
+    time_delta = date_time - date_time.replace(hour=0, minute=0, second=0, microsecond=0)
+    for (time_min, time_max) in bounds_list:
+        if time_min <= time_delta and time_delta < time_max:
+            return True
+    return False
+
 def getNotificationsAndActivatingSensors(dropbox_files, file_history,
-    sensor_history, pause_duration, fallback_utc_offset, datetime_now):
+    sensor_history, pause_duration, fallback_utc_offset, datetime_now, whitelist_times):
     # Array of tuples to store results of the upcoming search
     notifications_to_send = []
     sensors_status = {}
@@ -109,21 +131,28 @@ def getNotificationsAndActivatingSensors(dropbox_files, file_history,
                 print(f"Could not process file name {filename}: " + str(e))
                 continue # Malformed filename, don't worry about it
 
+            # white listing feature - only show a notification if time in whitelist
+            suppress = not time_ranges_contain_time_from_date(whitelist_times, recorded_at)
+
             # Append notification regardless of whether or not any sensor will trigger an email
-            notifications_to_send.append((entry, recorded_at, sensor_name))
-            # Have we seen this sensor before?
-            if sensor_name in sensor_history:
-                # This used to be: how long between recorded date and previous 
-                # sensor fire:
-                #elapsed_time = recorded_at - previous_fire
-                # But what we really want to know is how long since the last
-                # sensor fire and now? Which is taken care of above.
-                # Once we know that it is simply a case of reporting any
-                # files that have not been repported yet.
-                sensors_status[sensor_name] = sensors_status[sensor_name].activate()              
-            else:
-                # Brand new sensor, add it to the list
-                sensors_status[sensor_name] = SensorState.ACTIVATED
+            notifications_to_send.append((entry, recorded_at, sensor_name, suppress))
+
+            # if this activity occurred outside of the whitelist times, never show
+            # a notification - and never activate the sensor
+            if not suppress:
+                # Have we seen this sensor before?
+                if sensor_name in sensor_history:
+                    # This used to be: how long between recorded date and previous 
+                    # sensor fire:
+                    #elapsed_time = recorded_at - previous_fire
+                    # But what we really want to know is how long since the last
+                    # sensor fire and now? Which is taken care of above.
+                    # Once we know that it is simply a case of reporting any
+                    # files that have not been repported yet.
+                    sensors_status[sensor_name] = sensors_status[sensor_name].activate()              
+                else:
+                    # Brand new sensor, add it to the list
+                    sensors_status[sensor_name] = SensorState.ACTIVATED
  
     return (notifications_to_send, sensors_status)
 
@@ -140,17 +169,22 @@ def updateState(notifications_to_send, sensors_status, file_history, sensor_hist
     # If *any* sensor has ACTIVATED (not on a timeout ACTIVATED_PAUSED):
     #     then send all notifications
     # The following case should not happen:
-    #   If *all* sensors are IDLE and there are pending notifications
+    #   ~~If *all* sensors are IDLE and there are pending notifications~~
+    # There pay be suppressed notifications however!
     # In other combinations of IDLE/PAUSED/ACTIVATED_PAUSED we do NOT send 
     # notifications.
     any_activation = any(v == SensorState.ACTIVATED for (k,v) in sensors_status.items())
     
     all_idle = all((v == SensorState.IDLE for (k,v) in sensors_status.items()))
-    assert (not all_idle or len(notifications_to_send) == 0), "All sensors are IDLE but there are pending notifications!"
+    assert (not all_idle or sum(not suppressed for (_,_,_, suppressed) in notifications_to_send) == 0), "All sensors are IDLE but there are pending notifications!"
     
     send_notifications = any_activation #or all_idle
-    for (entry, *_) in notifications_to_send:
-        file_history[entry.name] = send_notifications
+    for (entry, _, _, suppress) in notifications_to_send:
+        # here we record if we will send a notification
+        # If suppress then we store None to indicate no notification is sent
+        # Otherwise record if all notifications were sent or not - ones stored as false will be picked up on next
+        # sensor activation
+        file_history[entry.name] = None if suppress else send_notifications 
 
     # Return the updated state
     return (file_history, sensor_history, send_notifications)
@@ -186,7 +220,12 @@ def formatNotifications(notifications_to_send, sensors_status, href_function):
         sensor_header = f"<h2>Suspicious recordings from { sensor_name }</h2>"
         header_added = False
         for notification in notifications_to_send:
-            (entry, _recorded_at, notification_sensor) = notification
+            (entry, _recorded_at, notification_sensor, suppress) = notification
+            
+            if suppress:
+                # this case should not happen
+                continue
+
             if sensor_name != notification_sensor:
                 continue
 
@@ -194,7 +233,7 @@ def formatNotifications(notifications_to_send, sensors_status, href_function):
                 email_body += sensor_header
                 header_added = True
             
-            # get the drop box file name, get the path_lower to use for get_temporary_link
+            # get the drop box file name, get the path_lower to use for href
             filename = entry.name
             db_path = entry.path_lower
             db_href = href_function(db_path) 

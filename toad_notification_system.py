@@ -59,8 +59,9 @@ send_to_emails = toad_functions.getEmailsFromDropbox(system_configuration["filen
 now = datetime.now(timezone.utc)
 pause_duration = system_configuration["pause_duration"]
 fallback_utc_offset = timedelta(seconds=(system_configuration["fallback_utc_offset"]))
+whitelist_times = toad_functions.parse_whitelist_times(system_configuration["whitelist_times_of_day"])
 (notifications_to_send, sensors_status) = toad_functions.getNotificationsAndActivatingSensors(
-    dropbox_files,file_history, sensor_history, pause_duration, fallback_utc_offset, now)
+    dropbox_files,file_history, sensor_history, pause_duration, fallback_utc_offset, now, whitelist_times)
 
 # in a new instance, when there are no history files available (files.json and sensors.json)
 # we modify the sensor activation date to now - pause_duration. This way we alert

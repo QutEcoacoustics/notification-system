@@ -45,6 +45,8 @@ Place a `config.json` file alongside `toad_functions.py` etc with the following 
   "root_folder": "/instance/audio",
   // the folder containing log folders. optional
   "log_folder": "/instance/logs",
+  // the folder where status reports should be stored. optional. defaults to `log_folder`
+  "save_status_reports_folder": "/instance/status",
   // when to update the status report
   "update_status_report_at": ["00:00", "12:00"],
   // a name that can be used to identify the instance that sent the notification

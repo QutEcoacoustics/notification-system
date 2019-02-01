@@ -100,6 +100,7 @@ print("Updating sensor health")
 # get a list of sensor folders
 status_path = system_configuration["log_folder"]
 update_at = system_configuration["update_status_report_at"]
+status_save_path = system_configuration["save_status_reports_folder"] or system_configuration["log_folder"]
 
 if status_path:
     if update_at and toad_functions.closeToTimeOfDay(now, update_at):
@@ -121,13 +122,13 @@ if status_path:
         # upload the report to dropbox
         content = json.dumps(full_report)
         
-        report_path = status_path + "/sensors_status.json"
+        report_path = status_save_path + "/sensors_status.json"
         print("Uploading report to " + report_path)
         toad_functions.uploadFileToDropbox(dbx, content, report_path)
 
         # upload the html report viewer
         target_date = now.date()
-        report_path = status_path + f"/sensors_status_{target_date.isoformat()}.html"
+        report_path = status_save_path + f"/sensors_status_{target_date.isoformat()}.html"
         print("Uploading template to " + report_path)
         with open("sensors_status.template.html", 'r', encoding = 'utf-8') as f:
             viewer_template = f.read()
